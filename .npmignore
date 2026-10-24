@@ -1,0 +1,3 @@
+# 编辑工具在 lib/ 下留的 0 字节锁文件，不属于包内容
+lib/.dsh-ops-update-*.lock
+*.lock

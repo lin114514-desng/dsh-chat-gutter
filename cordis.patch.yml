@@ -1,0 +1,6 @@
+# dsh-chat-gutter bundle patch：插入一条 Loader 行。
+# 行 id 与包名相同，Host 配置命名空间即 dsh-chat-gutter；
+# 浏览器半边由 package.json 的 exports["./client"] 挂进 __DSH_BOOT__。
+- insert:
+    - id: dsh-chat-gutter
+      name: 'dsh-chat-gutter'

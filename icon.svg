@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <!-- 时间线：左侧一条细轨、三枚节点，右侧三块路标 -->
+  <path d="M5 3.5v17" opacity=".55"/>
+  <circle cx="5" cy="6.5" r="1.15" fill="currentColor" stroke="none"/>
+  <circle cx="5" cy="12" r="1.15" fill="currentColor" stroke="none"/>
+  <circle cx="5" cy="17.5" r="1.15" fill="currentColor" stroke="none"/>
+  <path d="M9 5h6.5a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H9"/>
+  <path d="M9 10.5h9a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H9" opacity=".7"/>
+  <path d="M9 16h4.5a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H9" opacity=".45"/>
+</svg>
