@@ -363,7 +363,9 @@ async function openPanelIn(dom) {
   const nav = dom.doc.getElementById('dsh-chat-gutter-nav')
   assert.notEqual(nav, null)
   const button = nav.querySelector('[data-dsh-gutter-nav-btn]')
-  const panel = nav.querySelector('[data-dcg-panel]')
+  // 面板挂在 body 下（输入区祖先一有 transform/filter/contain，fixed 就会改认祖先做参照），
+  // 不再挂在按钮旁边那层插槽里。
+  const panel = dom.doc.querySelector('[data-dcg-panel]')
   assert.notEqual(button, null)
   assert.notEqual(panel, null)
   return { dom, exports, dispose, nav, button, panel }
@@ -457,7 +459,7 @@ test('快速移动面板：有真滚动容器时直接写 scrollTop，不再调 
   exports.__test.mountNav(dom.doc.body)
 
   const nav = dom.doc.getElementById('dsh-chat-gutter-nav')
-  const panel = nav.querySelector('[data-dcg-panel]')
+  const panel = dom.doc.querySelector('[data-dcg-panel]')
   const button = nav.querySelector('[data-dsh-gutter-nav-btn]')
   button.dispatchEvent({ type: 'click' })
 
@@ -471,6 +473,73 @@ test('快速移动面板：有真滚动容器时直接写 scrollTop，不再调 
   assert.equal(row.lastScrollIntoView, undefined)
 
   dispose()
+})
+
+test('快速移动面板：面板挂在 body 下，插槽里只剩按钮，收起后整块移除', async () => {
+  const dom = buildPanelDom()
+  const slot = dom.doc.createElement('div')
+  slot.setAttribute('data-slot', 'conversation.input.left')
+  dom.doc.body.appendChild(slot)
+
+  const { exports } = loadClient({ window: makeWindowStub(), document: dom.doc })
+  const dispose = exports.apply(buildCtx().ctx)
+  exports.__test.mountNav(slot)
+
+  const nav = dom.doc.getElementById('dsh-chat-gutter-nav')
+  assert.equal(nav.parentNode, slot)
+  const panel = dom.doc.querySelector('[data-dcg-panel]')
+  assert.notEqual(panel, null)
+  assert.equal(panel.parentNode, dom.doc.body)
+  assert.equal(nav.querySelector('[data-dcg-panel]'), null)
+
+  // 打开后仍留在 body 下：定位靠 fixed，不进插槽、不参与输入区排版。
+  nav.querySelector('[data-dsh-gutter-nav-btn]').dispatchEvent({ type: 'click' })
+  assert.equal(panel.style.display, 'flex')
+  assert.equal(panel.parentNode, dom.doc.body)
+
+  dispose()
+  assert.equal(dom.doc.querySelector('[data-dcg-panel]'), null)
+})
+
+test('快速移动面板：样式表按当前版本刷新，热替换留下的旧样式不留在页面上', async () => {
+  const dom = buildPanelDom()
+  const stale = dom.doc.createElement('style')
+  stale.setAttribute('id', 'dsh-chat-gutter-style')
+  stale.textContent = '.dcg-nav-btn{display:inline-flex}'
+  dom.doc.head.appendChild(stale)
+
+  const { exports } = loadClient({ window: makeWindowStub(), document: dom.doc })
+  const dispose = exports.apply(buildCtx().ctx)
+
+  // 复用同一个 style 节点，但内容必须换成本版——否则新加的规则永远进不了页面。
+  const style = dom.doc.getElementById('dsh-chat-gutter-style')
+  assert.equal(style, stale)
+  assert.ok(String(style.textContent).includes('.dcg-panel{'))
+  assert.ok(String(style.textContent).includes('.dcg-entry{'))
+  assert.ok(String(style.textContent).includes('.dcg-panel-cats{'))
+
+  dispose()
+})
+
+test('快速移动面板：热替换留下的旧 DOM 拆掉重建，页面上只剩一份面板', async () => {
+  const dom = buildPanelDom()
+  const first = loadClient({ window: makeWindowStub(), document: dom.doc })
+  const dispose1 = first.exports.apply(buildCtx().ctx)
+  first.exports.__test.mountNav(dom.doc.body)
+  const nav1 = dom.doc.getElementById('dsh-chat-gutter-nav')
+
+  const second = loadClient({ window: makeWindowStub(), document: dom.doc })
+  const dispose2 = second.exports.apply(buildCtx().ctx)
+  second.exports.__test.mountNav(dom.doc.body)
+  const nav2 = dom.doc.getElementById('dsh-chat-gutter-nav')
+
+  // 旧节点连它的旧监听一起作废：新代码必须管到自己建的那一份。
+  assert.notEqual(nav2, nav1)
+  assert.equal(dom.doc.querySelectorAll('[data-dcg-panel]').length, 1)
+  assert.equal(nav2.querySelectorAll('[data-dcg-panel]').length, 0)
+
+  dispose2()
+  dispose1()
 })
 
 test('过程组收起后徽标仍在：隐藏行计入 ⚙️/🤔，锚点退到组根元素', async () => {
