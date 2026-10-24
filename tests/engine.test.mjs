@@ -603,6 +603,73 @@ test('快速移动面板：点收起组的编号先派发 beforematch 展开，�
   ui.dispose()
 })
 
+test('快速移动面板：过程组条目跳过组头，显示组里的真实内容', async () => {
+  const dom = buildPanelDom({ withQuestion: false })
+  // 真机结构：席位 ＝ 组头 ＋ [data-step-process-body]（组里第一行才是真实内容）。
+  const seat = dom.doc.createElement('div')
+  seat.setAttribute('data-chat-flow-key', 'g7')
+  seat.setAttribute('data-chat-turn', '2')
+  seat.setAttribute('data-step-process', 'true')
+  seat.rect = rect(300, 600, 600, 26)
+  const header = dom.doc.createElement('div')
+  header.textContent = '已调用工具，已读取文件，已写入文件等'
+  const body = dom.doc.createElement('div')
+  body.setAttribute('data-step-process-body', '')
+  const content = dom.doc.createElement('div')
+  content.setAttribute('data-step-process-content', '')
+  const firstRow = dom.doc.createElement('div')
+  firstRow.textContent = '读取 handoff-1024-2032-插件B标识带.md'
+  content.appendChild(firstRow)
+  body.appendChild(content)
+  seat.appendChild(header)
+  seat.appendChild(body)
+  dom.flow.appendChild(seat)
+
+  const ui = await openPanelIn(dom)
+  ui.button.dispatchEvent({ type: 'click' })
+  const cats = ui.panel.querySelectorAll('[data-dcg-cat]')
+  cats.find((item) => item.getAttribute('data-dcg-cat') === 'tool').dispatchEvent({ type: 'click' })
+  const entries = ui.panel.querySelector('[data-dcg-list]').querySelectorAll('[data-dcg-entry]')
+  const hit = entries.find((item) => item.textContent.includes('handoff'))
+  assert.notEqual(hit, undefined)
+  // 工具类前面已有小结行与命令行，这条排第 3；文案从组内容起头，不带「已调用工具…」。
+  assert.match(hit.textContent, /^3 · 读取 handoff/)
+  assert.ok(!hit.textContent.includes('已调用工具'))
+
+  ui.dispose()
+})
+
+test('快速移动面板：路径只差文件名时，摘要取末尾，两条能分清', async () => {
+  const dom = buildPanelDom({ withQuestion: false })
+  for (const name of ['one.md', 'two.md']) {
+    const seat = dom.doc.createElement('div')
+    seat.setAttribute('data-chat-flow-key', 'g-' + name)
+    seat.setAttribute('data-step-process', 'true')
+    seat.rect = rect(300, 600, 600, 26)
+    const body = dom.doc.createElement('div')
+    body.setAttribute('data-step-process-body', '')
+    const row = dom.doc.createElement('div')
+    row.textContent = '读取F:\\01AI\\01software\\00文档MD backup\\handoff backup\\' + name
+    body.appendChild(row)
+    seat.appendChild(body)
+    dom.flow.appendChild(seat)
+  }
+
+  const ui = await openPanelIn(dom)
+  ui.button.dispatchEvent({ type: 'click' })
+  const cats = ui.panel.querySelectorAll('[data-dcg-cat]')
+  cats.find((item) => item.getAttribute('data-dcg-cat') === 'tool').dispatchEvent({ type: 'click' })
+  const entries = ui.panel.querySelector('[data-dcg-list]').querySelectorAll('[data-dcg-entry]')
+  const texts = entries.map((item) => item.textContent)
+  const one = texts.find((text) => text.endsWith('one.md'))
+  const two = texts.find((text) => text.endsWith('two.md'))
+  assert.notEqual(one, undefined)
+  assert.notEqual(two, undefined)
+  assert.notEqual(one, two)
+
+  ui.dispose()
+})
+
 test('过程组收起后徽标仍在：隐藏行计入 ⚙️/🤔，锚点退到组根元素', async () => {
   const doc = new FakeDocument()
   const flow = doc.createElement('div')
