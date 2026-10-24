@@ -542,6 +542,67 @@ test('快速移动面板：热替换留下的旧 DOM 拆掉重建，页面上只
   dispose1()
 })
 
+test('快速移动面板：收起的过程组仍进面板，按组文案归到提问/工具', async () => {
+  const dom = buildPanelDom({ withQuestion: false })
+  // 收起的回合：过程组整块带 hidden（屏幕上只剩一条汇总行），组里的提问不能跟着消失。
+  const seat = dom.doc.createElement('div')
+  seat.setAttribute('data-chat-flow-key', 'g9')
+  seat.setAttribute('data-chat-turn', '2')
+  seat.setAttribute('data-step-process', 'true')
+  seat.setAttribute('hidden', 'until-found')
+  seat.rect = rect(300, 700, 600, 0)
+  seat.textContent = '向用户提出了问题提问1/1 已回答'
+  dom.flow.appendChild(seat)
+
+  const ui = await openPanelIn(dom)
+  ui.button.dispatchEvent({ type: 'click' })
+
+  const cats = ui.panel.querySelectorAll('[data-dcg-cat]')
+  const question = cats.find((item) => item.getAttribute('data-dcg-cat') === 'question')
+  assert.equal(question.getAttribute('data-count'), '1')
+
+  question.dispatchEvent({ type: 'click' })
+  const entries = ui.panel.querySelector('[data-dcg-list]').querySelectorAll('[data-dcg-entry]')
+  assert.equal(entries.length, 1)
+  assert.match(entries[0].textContent, /^1 · 向用户提出了问题/)
+
+  ui.dispose()
+})
+
+test('快速移动面板：点收起组的编号先派发 beforematch 展开，再滚到那一行', async () => {
+  const dom = buildPanelDom({ withQuestion: false })
+  const seat = dom.doc.createElement('div')
+  seat.setAttribute('data-chat-flow-key', 'g9')
+  seat.setAttribute('data-chat-turn', '2')
+  seat.setAttribute('data-step-process', 'true')
+  seat.setAttribute('hidden', 'until-found')
+  seat.rect = rect(300, 700, 600, 0)
+  seat.textContent = '向用户提出了问题提问1/1 已回答'
+  let reveals = 0
+  // 官方在带 hidden 的元素上挂 beforematch，收到就展开（见 ui-chat 的 searchable-hidden）。
+  seat.addEventListener('beforematch', () => {
+    reveals += 1
+    seat.removeAttribute('hidden')
+    seat.rect = rect(300, 700, 600, 26)
+  })
+  dom.flow.appendChild(seat)
+
+  const ui = await openPanelIn(dom)
+  ui.button.dispatchEvent({ type: 'click' })
+  const cats = ui.panel.querySelectorAll('[data-dcg-cat]')
+  cats.find((item) => item.getAttribute('data-dcg-cat') === 'question').dispatchEvent({ type: 'click' })
+  const entry = ui.panel.querySelector('[data-dcg-list]').querySelectorAll('[data-dcg-entry]')[0]
+  entry.dispatchEvent({ type: 'click' })
+
+  // 先展开，等展开后的那一帧再量位置：此刻还没滚。
+  assert.equal(reveals, 1)
+  assert.equal(seat.lastScrollIntoView, undefined)
+  await sleep(200)
+  assert.notEqual(seat.lastScrollIntoView, undefined)
+
+  ui.dispose()
+})
+
 test('过程组收起后徽标仍在：隐藏行计入 ⚙️/🤔，锚点退到组根元素', async () => {
   const doc = new FakeDocument()
   const flow = doc.createElement('div')
