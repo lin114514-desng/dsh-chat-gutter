@@ -220,7 +220,7 @@ test('新增工具行：一串变动合并成一次结构检查，徽标跟着�
 
   const after = stats(exports)
   assert.equal(after.full, before.full + 1, '一串变动只该合成一次全量重扫')
-  assert.ok(bandTexts(dom.doc, 'dsh-chat-gutter').includes('⚙️2 🤔1'), '徽标没跟上：' + JSON.stringify(bandTexts(dom.doc, 'dsh-chat-gutter')))
+  assert.ok(bandTexts(dom.doc, 'dsh-chat-gutter').includes('⚙️2 🧐1'), '徽标没跟上：' + JSON.stringify(bandTexts(dom.doc, 'dsh-chat-gutter')))
 })
 
 test('结构不变时连刷多轮也不重复重扫（空闲即静止）', async () => {

@@ -162,9 +162,9 @@ test('真实扫描：编号/徽标/回答高亮/提问卡/思考块都出现在�
 
   const texts = bandTexts(dom.doc, 'dsh-chat-gutter')
   assert.ok(!texts.includes('#1'))
-  assert.ok(texts.includes('⚙️1 🤔1'))
+  assert.ok(texts.includes('⚙️1 🧐1'))
   assert.ok(texts.includes('⌨️1'))
-  assert.ok(texts.includes('❓提问'))
+  assert.ok(texts.includes('🤔提问'))
   assert.equal(texts.filter((text) => text === '▶答').length, 2)
 
   assert.equal(dom.answer1.getAttribute('data-dsh-answer-start'), '1')
@@ -179,6 +179,32 @@ test('真实扫描：编号/徽标/回答高亮/提问卡/思考块都出现在�
   dispose()
   assert.equal(dom.doc.getElementById('dsh-chat-gutter'), null)
   assert.equal(dom.answer1.getAttribute('data-dsh-answer-start'), null)
+})
+
+test('提问行在左带留下 🤔 标记：答过的提问没有提问卡，也要有标记', async () => {
+  const dom = buildDom()
+  // 答过的提问在历史里只剩过程组那一行，提问卡已经撤掉。
+  const seat = dom.doc.createElement('div')
+  seat.setAttribute('data-chat-flow-key', 'q-seat')
+  seat.setAttribute('data-chat-turn', '2')
+  seat.setAttribute('data-step-process', 'true')
+  seat.rect = rect(300, 640, 600, 26)
+  const header = dom.doc.createElement('div')
+  header.rect = rect(300, 640, 600, 26)
+  header.textContent = '向用户提出了问题 提问2/2 已回答'
+  seat.appendChild(header)
+  const body = dom.doc.createElement('div')
+  body.setAttribute('data-step-process-body', '')
+  seat.appendChild(body)
+  dom.flow.appendChild(seat)
+
+  const { exports } = loadClient({ window: makeWindowStub(), document: dom.doc })
+  const dispose = exports.apply(buildCtx().ctx)
+
+  const texts = bandTexts(dom.doc, 'dsh-chat-gutter')
+  assert.equal(texts.filter((text) => text === '🤔').length, 1)
+
+  dispose()
 })
 
 test('配置开关：关总开关立刻清空，重新打开立刻恢复；窄窗口隐藏整条带', async () => {
@@ -302,13 +328,13 @@ test('过程徽标合并：一个回合只出 ⚙️N 🤔N 一个徽标，不�
   const texts = bandTexts(dom.doc, 'dsh-chat-gutter')
   // buildDom 里 turn1 有 1 个 tool-call + 1 个 think 块，turn2 有 1 个 command。
   assert.equal(texts.filter((text) => text === '⚙️工具').length, 0)
-  // buildDom：turn1 = 1 工具 + 1 思考 → ⚙️1 🤔1；turn2 = 1 命令 → ⌨️1。
+  // buildDom：turn1 = 1 工具 + 1 思考 → ⚙️1 🧐1；turn2 = 1 命令 → ⌨️1。
   assert.equal(texts.filter((text) => text.startsWith('⚙️')).length, 1)
-  assert.ok(texts.includes('⚙️1 🤔1'))
+  assert.ok(texts.includes('⚙️1 🧐1'))
   assert.ok(texts.includes('⌨️1'))
   // 回答起点与提问卡不受合并影响。
   assert.ok(texts.includes('▶答'))
-  assert.ok(texts.includes('❓提问'))
+  assert.ok(texts.includes('🤔提问'))
   assert.equal(dom.answer1.getAttribute('data-dsh-answer-start'), '1')
 
   dispose()
@@ -670,7 +696,7 @@ test('快速移动面板：路径只差文件名时，摘要取末尾，两条�
   ui.dispose()
 })
 
-test('过程组收起后徽标仍在：隐藏行计入 ⚙️/🤔，锚点退到组根元素', async () => {
+test('过程组收起后徽标仍在：隐藏行计入 ⚙️/🧐，锚点退到组根元素', async () => {
   const doc = new FakeDocument()
   const flow = doc.createElement('div')
   flow.setAttribute('data-slot', 'conversation.chat.flow')

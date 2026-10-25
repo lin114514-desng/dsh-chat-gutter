@@ -15,11 +15,11 @@ test('编号带落点：右侧留得下就贴内容右边缘，留不下返回 n
   assert.equal(t.gutterRight(300, 0, 92, 8, 4, 1770), null)
 })
 
-test('过程徽标文案：⚙️工具 ⌨️命令 🤔思考分开计数，没有的类不写，全无则不出徽标', () => {
+test('过程徽标文案：⚙️工具 ⌨️命令 🧐思考分开计数，没有的类不写，全无则不出徽标', () => {
   const t = api()
-  assert.equal(t.processBadgeText(12, 0, 5), '⚙️12 🤔5')
+  assert.equal(t.processBadgeText(12, 0, 5), '⚙️12 🧐5')
   assert.equal(t.processBadgeText(1, 2, 0), '⚙️1 ⌨️2')
-  assert.equal(t.processBadgeText(0, 0, 3), '🤔3')
+  assert.equal(t.processBadgeText(0, 0, 3), '🧐3')
   assert.equal(t.processBadgeText(0, 0, 0), null)
 })
 
@@ -111,7 +111,7 @@ test('行级徽标：工具/命令/思考/压缩各归各，正文行没有徽�
   assert.equal(t.badgeForKind('tool-call'), '⚙️工具')
   assert.equal(t.badgeForKind('tool-result'), '⚙️工具')
   assert.equal(t.badgeForKind('command'), '⌨️命令')
-  assert.equal(t.badgeForKind('reasoning'), '🤔思考')
+  assert.equal(t.badgeForKind('reasoning'), '🧐思考')
   assert.equal(t.badgeForKind('compaction'), '📦上下文压缩')
   assert.equal(t.badgeForKind('assistant-step'), null)
   assert.equal(t.badgeForKind('user'), null)
