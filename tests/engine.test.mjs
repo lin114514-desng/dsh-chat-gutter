@@ -207,6 +207,40 @@ test('提问行在左带留下 🤔 标记：答过的提问没有提问卡，�
   dispose()
 })
 
+test('提问按组头分类：组内容里提到 ask_user_question 的工具组不算提问，也不挂 🤔', async () => {
+  const dom = buildDom()
+  // 工具组的组头是「已完成分析」，但组里的思考文本提到了 ask_user_question。
+  const seat = dom.doc.createElement('div')
+  seat.setAttribute('data-chat-flow-key', 'tool-seat')
+  seat.setAttribute('data-chat-turn', '2')
+  seat.setAttribute('data-step-process', 'true')
+  seat.rect = rect(300, 660, 600, 26)
+  const header = dom.doc.createElement('div')
+  header.rect = rect(300, 660, 600, 26)
+  header.textContent = '已完成分析'
+  seat.appendChild(header)
+  const body = dom.doc.createElement('div')
+  body.setAttribute('data-step-process-body', '')
+  const row = dom.doc.createElement('div')
+  row.textContent = '思考 用 ask_user_question 问一下用户'
+  body.appendChild(row)
+  seat.appendChild(body)
+  dom.flow.appendChild(seat)
+
+  const { exports } = loadClient({ window: makeWindowStub(), document: dom.doc })
+  const dispose = exports.apply(buildCtx().ctx)
+
+  const texts = bandTexts(dom.doc, 'dsh-chat-gutter')
+  assert.equal(texts.filter((text) => text === '🤔').length, 0)
+
+  const entries = exports.__test.collectPanelEntries(dom.flow)
+  const seats = entries.filter((entry) => entry.el === seat)
+  assert.equal(seats.length, 1)
+  assert.equal(seats[0].type, 'tool')
+
+  dispose()
+})
+
 test('配置开关：关总开关立刻清空，重新打开立刻恢复；窄窗口隐藏整条带', async () => {
   const dom = buildDom()
   const windowStub = makeWindowStub()

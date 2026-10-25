@@ -1,6 +1,6 @@
 # dsh-chat-gutter 安装预案（desktop profile）
 
-> 目标：DSH 桌面端 0.2.1-rc.2，profile `C:\Users\27516\.dsh\profiles\desktop`，包版本 0.2.22。
+> 目标：DSH 桌面端 0.2.1-rc.2，profile `C:\Users\27516\.dsh\profiles\desktop`，包版本 0.2.23。
 > 依据《装皮肤专用记录.md》的硬性流程。安装前用户需明确同意；界面上的启用、停用、重启由用户亲手操作。
 > GUI 端口每次启动会变，从当次运行时上下文取，不写死。
 
@@ -11,7 +11,7 @@ cd "F:\01AI\dsh default\chuangzaomoshi\dsh-chat-gutter"
 node --check lib/client.js && node --check lib/index.js
 pnpm test
 pnpm pack
-tar -tzf dsh-chat-gutter-0.2.22.tgz
+tar -tzf dsh-chat-gutter-0.2.23.tgz
 ```
 
 包内只有六项：`package/lib/client.js`、`package/lib/index.js`、`package/package.json`、`package/README.md`、`package/icon.svg`、`package/cordis.patch.yml`。出现 `lib/.dsh-ops-update-*.lock` 就说明打包前没清锁文件，重打。
@@ -39,17 +39,17 @@ cd "F:\01AI\dsh default\chuangzaomoshi\dsh-chat-gutter"
 node --check lib/client.js && node --check lib/index.js && pnpm test
 
 # ② 打包并核对包内容与包内版本
-pnpm pack && tar -tzf dsh-chat-gutter-0.2.22.tgz && tar -xzOf dsh-chat-gutter-0.2.22.tgz package/package.json | grep '"version"'
+pnpm pack && tar -tzf dsh-chat-gutter-0.2.23.tgz && tar -xzOf dsh-chat-gutter-0.2.23.tgz package/package.json | grep '"version"'
 
 # ③ 装进 profile，再核三方一致
 cd "C:\Users\27516\.dsh\profiles\desktop"
-pnpm add "F:/01AI/dsh default/chuangzaomoshi/dsh-chat-gutter/dsh-chat-gutter-0.2.22.tgz" --save-exact -w --registry=https://registry.npmjs.org
+pnpm add "F:/01AI/dsh default/chuangzaomoshi/dsh-chat-gutter/dsh-chat-gutter-0.2.23.tgz" --save-exact -w --registry=https://registry.npmjs.org
 
 P="C:/Users/27516/.dsh/profiles/desktop"; W="F:/01AI/dsh default/chuangzaomoshi/dsh-chat-gutter"
 grep -n '"dsh-chat-gutter"' "$P/package.json"
 node -e "console.log(require('$P/node_modules/dsh-chat-gutter/package.json').version)"
 md5sum "$W/lib/client.js" "$P/node_modules/dsh-chat-gutter/lib/client.js"
-cd "$W" && tar -xzOf dsh-chat-gutter-0.2.22.tgz package/lib/client.js | md5sum
+cd "$W" && tar -xzOf dsh-chat-gutter-0.2.23.tgz package/lib/client.js | md5sum
 ```
 
 三项都通过后回报「已核对，可以重启」+ 版本号。同版本 tgz 不会替换已装文件，改代码必须先升版本号。
@@ -66,7 +66,7 @@ POST http://127.0.0.1:<当前端口>/dsh-market/toggle
 ## 五、装完核对与验收
 
 1. `node_modules\dsh-chat-gutter\` 存在，`lib/client.js`、`lib/index.js`、`cordis.patch.yml`、`icon.svg` 齐全，`lib/` 里没有 `.lock`。
-2. profile `package.json` 的 `dependencies` 有 `"dsh-chat-gutter": "file:...0.2.22.tgz"`，`dsh.profile.bundles` 有 `"dsh-chat-gutter"`。
+2. profile `package.json` 的 `dependencies` 有 `"dsh-chat-gutter": "file:...0.2.23.tgz"`，`dsh.profile.bundles` 有 `"dsh-chat-gutter"`。
 3. 用户托盘退出再启动（假重启会一直下发改动前的快照），进入页面后 `Ctrl+Shift+R` 强刷。
 4. 验收点：
    - 右侧出现 `#1 #2 …` 编号，滚动时跟随，细线连成时间线。
@@ -78,7 +78,7 @@ POST http://127.0.0.1:<当前端口>/dsh-market/toggle
    - 面板是浮在按钮上方的 340px 宽浮层（左列 118px）：开关面板时输入框与会话框的尺寸一点不动；按钮贴着窗口顶端时面板翻到按钮下面。
    - 已有回合的过程组是收起状态时，左列「AI 提问 / 工具」仍有条数；点这类编号会先展开那一回合，再滚到具体那一行。
    - 右列摘要显示的是内容本身（读了哪个文件、跑了什么命令），不是「已调用工具／已读取文件」这类组头；只差文件名的两条路径也能分清。
-   - 左带：回合徽标是 `⚙️N 🧐N`（🧐 是思考数）；「向用户提出了问题」那一行左侧有一枚 `🤔`，跟着滚动、滚出视野消失。面板左列第一项写作 `🤔 AI 提问`。
+   - 左带：回合徽标是 `⚙️N 🧐N`（🧐 是思考数）；「向用户提出了问题」那一行左侧有一枚 `🤔`，跟着滚动、滚出视野消失。面板左列第一项写作 `🤔 AI 提问`；只有组头是「向用户提出了问题」的组才挂 🤔，工具组不会误挂。
    - 窗口拉窄到没有空白带时整条标识带消失，不遮挡聊天内容。
    - 侧栏「插件」→ `dsh-chat-gutter` → 行 → 配置：四项能改、能保存；关总开关后所有标记消失，重新打开后恢复。
 5. 控制台应只有 `[dsh-chat-gutter] 已加载` 与若干 `扫描到 N 行`，无报错；`C:\Users\27516\AppData\Roaming\@deepseek-ai\dsh-desktop\logs\` 最新 `web-boot` 日志里没有 `dsh-chat-gutter: import failed`。
