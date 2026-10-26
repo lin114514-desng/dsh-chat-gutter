@@ -581,6 +581,20 @@ test('快速移动面板：样式表按当前版本刷新，热替换留下的�
   dispose()
 })
 
+test('快速移动面板：条目行不许被压缩，条数多了由列表自己滚动', async () => {
+  const dom = buildPanelDom()
+  const { exports } = loadClient({ window: makeWindowStub(), document: dom.doc })
+  const dispose = exports.apply(buildCtx().ctx)
+
+  // 竖向 flex 容器默认会把超出的条目挤扁：挤扁后内容不溢出，scrollHeight 等于 clientHeight，
+  // 滚动条永远不出现，表现成「条目多了，最后几条被切掉」（2026-10-25 真机量到 16 条被压成 17px）。
+  const css = String(exports.__test.styleSheet)
+  assert.match(css, /\.dcg-entry\{[^}]*flex:0 0 auto/)
+  assert.match(css, /\.dcg-panel-empty\{[^}]*flex:0 0 auto/)
+
+  dispose()
+})
+
 test('快速移动面板：热替换留下的旧 DOM 拆掉重建，页面上只剩一份面板', async () => {
   const dom = buildPanelDom()
   const first = loadClient({ window: makeWindowStub(), document: dom.doc })
@@ -726,6 +740,176 @@ test('快速移动面板：路径只差文件名时，摘要取末尾，两条�
   assert.notEqual(one, undefined)
   assert.notEqual(two, undefined)
   assert.notEqual(one, two)
+
+  ui.dispose()
+})
+
+// 官方把问答折在工具行里，点开才渲染——点它会展开折叠、改变页面滚动。
+// 只读路径：React 把组件数据挂在 DOM 节点的 __reactFiber$ 属性上，顺着它取题干，不碰页面。
+test('快速移动面板：提问组从节点自带的内部数据里读出题干，不再只有「已回答」', async () => {
+  const dom = buildPanelDom({ withQuestion: false })
+  const seat = dom.doc.createElement('div')
+  seat.setAttribute('data-chat-flow-key', 'g-ask')
+  seat.setAttribute('data-chat-turn', '2')
+  seat.setAttribute('data-step-process', 'true')
+  seat.rect = rect(300, 600, 600, 26)
+  // 组头是分类依据（只看 children[0]），组里那行工具行才挂着问答数据。
+  const askHeader = dom.doc.createElement('div')
+  askHeader.textContent = '向用户提出了问题'
+  seat.appendChild(askHeader)
+  dom.flow.appendChild(seat)
+
+  const row = dom.doc.createElement('div')
+  row.setAttribute('data-chat-flow-kind', 'tool-call')
+  row.textContent = '提问1/1 已回答'
+  seat.appendChild(row)
+  row['__reactFiber$probe'] = {
+    memoizedProps: {
+      data: { questions: [{ id: 'q1', header: '面板高度', question: '面板最多多高？' }], answers: [{ id: 'q1', values: ['保持 320'] }] },
+    },
+    return: null,
+  }
+
+  const ui = await openPanelIn(dom)
+  ui.button.dispatchEvent({ type: 'click' })
+  const cats = ui.panel.querySelectorAll('[data-dcg-cat]')
+  cats.find((item) => item.getAttribute('data-dcg-cat') === 'question').dispatchEvent({ type: 'click' })
+  const entries = ui.panel.querySelector('[data-dcg-list]').querySelectorAll('[data-dcg-entry]')
+  assert.equal(entries.length, 1)
+  assert.match(entries[0].textContent, /面板高度/)
+  assert.match(entries[0].textContent, /面板最多多高/)
+  // 悬停看到题干全文（多个提问会全列出来）。
+  assert.match(entries[0].title, /面板最多多高/)
+
+  ui.dispose()
+})
+
+test('快速移动面板：读不到节点内部数据时，提问组退回原本的组内容文案', async () => {
+  const dom = buildPanelDom()
+  const ui = await openPanelIn(dom)
+  ui.button.dispatchEvent({ type: 'click' })
+  const cats = ui.panel.querySelectorAll('[data-dcg-cat]')
+  cats.find((item) => item.getAttribute('data-dcg-cat') === 'question').dispatchEvent({ type: 'click' })
+  const entries = ui.panel.querySelector('[data-dcg-list]').querySelectorAll('[data-dcg-entry]')
+  assert.equal(entries.length, 1)
+  assert.match(entries[0].textContent, /向用户提出了问题/)
+
+  ui.dispose()
+})
+
+// 那一列由 data-chat-flow 标识，聊天流本体是列里的 [data-slot="conversation.chat.flow"]。
+function buildOlderDom(options = {}) {
+  const doc = new FakeDocument()
+  const column = doc.createElement('div')
+  column.setAttribute('data-chat-flow', '')
+  column.rect = rect(300, 0, 600, 800)
+  doc.body.appendChild(column)
+
+  let older = null
+  if (options.hasMore !== false) {
+    const wrap = doc.createElement('div')
+    // 真机类名带 hash（xz4KEq_older），本地名 older 留着当备用判据。
+    wrap.className = 'ChatView_module_css_default older'
+    older = doc.createElement('button')
+    older.textContent = options.loading === true ? '加载中…' : (options.label ?? '加载更早')
+    if (options.loading === true) older.disabled = true
+    older.clickCount = 0
+    older.click = () => {
+      older.clickCount += 1
+    }
+    wrap.appendChild(older)
+    column.appendChild(wrap)
+  }
+
+  const flow = doc.createElement('div')
+  flow.setAttribute('data-slot', 'conversation.chat.flow')
+  flow.rect = rect(300, 0, 600, 800)
+  column.appendChild(flow)
+  addRow(doc, flow, { key: 'u1', turn: '1', kind: 'user', top: 100, height: 30, text: '你好' })
+  addRow(doc, flow, { key: 'a1', turn: '1', kind: 'assistant-step', top: 160, height: 60, text: '第一段回答' })
+
+  return { doc, column, flow, older }
+}
+
+test('快速移动面板：有更早历史时面板底部出现「加载更早」，点它等于点官方按钮并收起面板', async () => {
+  const dom = buildOlderDom()
+  const ui = await openPanelIn(dom)
+  ui.button.dispatchEvent({ type: 'click' })
+
+  const more = ui.panel.querySelector('[data-dcg-more]')
+  assert.notEqual(more, null)
+  assert.equal(more.style.display, 'block')
+  assert.equal(more.textContent, '⬆️ 加载更早')
+
+  more.dispatchEvent({ type: 'click' })
+  // 入口自己不加载历史：只是替用户点官方那个按钮。
+  assert.equal(dom.older.clickCount, 1)
+  assert.equal(ui.panel.style.display, 'none')
+
+  ui.dispose()
+})
+
+test('快速移动面板：没有更早历史时「加载更早」入口不出现', async () => {
+  const dom = buildOlderDom({ hasMore: false })
+  const ui = await openPanelIn(dom)
+  ui.button.dispatchEvent({ type: 'click' })
+
+  const more = ui.panel.querySelector('[data-dcg-more]')
+  assert.notEqual(more, null)
+  assert.equal(more.style.display, 'none')
+  assert.equal(dom.older, null)
+
+  ui.dispose()
+})
+
+test('快速移动面板：官方按钮在加载中时，入口跟着显示「加载中…」且点了没反应', async () => {
+  const dom = buildOlderDom({ loading: true })
+  const ui = await openPanelIn(dom)
+  ui.button.dispatchEvent({ type: 'click' })
+
+  const more = ui.panel.querySelector('[data-dcg-more]')
+  assert.equal(more.style.display, 'block')
+  assert.equal(more.textContent, '加载中…')
+  assert.equal(more.disabled, true)
+
+  more.dispatchEvent({ type: 'click' })
+  assert.equal(dom.older.clickCount, 0)
+  assert.equal(ui.panel.style.display, 'flex')
+
+  ui.dispose()
+})
+
+test('快速移动面板：聊天流内部的按钮不算「加载更早」', async () => {
+  const dom = buildOlderDom({ hasMore: false })
+  const inner = dom.doc.createElement('button')
+  inner.textContent = '加载更早'
+  dom.flow.appendChild(inner)
+
+  const ui = await openPanelIn(dom)
+  ui.button.dispatchEvent({ type: 'click' })
+  assert.equal(ui.panel.querySelector('[data-dcg-more]').style.display, 'none')
+
+  ui.dispose()
+})
+
+test('快速移动面板：位置判不出来时按文案兜底，英文界面也认得出', async () => {
+  const dom = buildOlderDom({ hasMore: false })
+  const late = dom.doc.createElement('button')
+  late.textContent = 'Load earlier'
+  let clicks = 0
+  late.click = () => {
+    clicks += 1
+  }
+  // 聊天流之后、同一列里的按钮：位置判据不成立，只剩文案这一条路。
+  dom.column.appendChild(late)
+
+  const ui = await openPanelIn(dom)
+  ui.button.dispatchEvent({ type: 'click' })
+  const more = ui.panel.querySelector('[data-dcg-more]')
+  assert.equal(more.style.display, 'block')
+
+  more.dispatchEvent({ type: 'click' })
+  assert.equal(clicks, 1)
 
   ui.dispose()
 })
