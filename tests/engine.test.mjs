@@ -616,6 +616,28 @@ test('快速移动面板：热替换留下的旧 DOM 拆掉重建，页面上只
   dispose1()
 })
 
+test('快速移动按钮与同一行兄弟对齐：插槽容器改成居中 flex，按钮不再被行高顶下去', async () => {
+  const dom = buildPanelDom()
+  const slot = dom.doc.createElement('div')
+  // 真机里这一层是插件自己渲染的容器（QuickNav 的根），父级行高 29px 会按基线把按钮压低。
+  slot.setAttribute('data-dsh-gutter-nav-root', '1')
+  dom.doc.body.appendChild(slot)
+
+  const { exports } = loadClient({ window: makeWindowStub(), document: dom.doc })
+  const dispose = exports.apply(buildCtx().ctx)
+  exports.__test.mountNav(slot)
+  assert.equal(slot.style.display, 'flex')
+  assert.equal(slot.style.alignItems, 'center')
+
+  // 不是自己的容器不动：别人家节点的布局不能改。
+  const other = dom.doc.createElement('div')
+  dom.doc.body.appendChild(other)
+  exports.__test.mountNav(other)
+  assert.equal(other.style.display, undefined)
+
+  dispose()
+})
+
 test('快速移动面板：收起的过程组仍进面板，按组文案归到提问/工具', async () => {
   const dom = buildPanelDom({ withQuestion: false })
   // 收起的回合：过程组整块带 hidden（屏幕上只剩一条汇总行），组里的提问不能跟着消失。
@@ -780,6 +802,88 @@ test('快速移动面板：提问组从节点自带的内部数据里读出题�
   assert.match(entries[0].textContent, /面板最多多高/)
   // 悬停看到题干全文（多个提问会全列出来）。
   assert.match(entries[0].title, /面板最多多高/)
+
+  ui.dispose()
+})
+
+test('快速移动面板：题干藏在工具入参的 JSON 字符串里也能读出来', async () => {
+  const dom = buildPanelDom({ withQuestion: false })
+  const seat = dom.doc.createElement('div')
+  seat.setAttribute('data-chat-flow-key', 'g-ask-json')
+  seat.setAttribute('data-chat-turn', '2')
+  seat.setAttribute('data-step-process', 'true')
+  seat.rect = rect(300, 600, 600, 26)
+  const askHeader = dom.doc.createElement('div')
+  askHeader.textContent = '向用户提出了问题'
+  seat.appendChild(askHeader)
+  dom.flow.appendChild(seat)
+
+  const row = dom.doc.createElement('div')
+  row.setAttribute('data-chat-flow-kind', 'tool-call')
+  row.textContent = '提问1/1 已回答'
+  seat.appendChild(row)
+  // 真机上工具入参是一段 JSON 文本，题干在里面，得解开才看得到。
+  row['__reactFiber$probe2'] = {
+    memoizedProps: {
+      call: {
+        name: 'ask_user_question',
+        input: JSON.stringify({ questions: [{ header: '', question: '这个方案行不行？', options: [{ label: '行' }, { label: '不行' }] }] }),
+      },
+    },
+    return: null,
+  }
+
+  const ui = await openPanelIn(dom)
+  ui.button.dispatchEvent({ type: 'click' })
+  const cats = ui.panel.querySelectorAll('[data-dcg-cat]')
+  cats.find((item) => item.getAttribute('data-dcg-cat') === 'question').dispatchEvent({ type: 'click' })
+  const entries = ui.panel.querySelector('[data-dcg-list]').querySelectorAll('[data-dcg-entry]')
+  assert.equal(entries.length, 1)
+  assert.match(entries[0].textContent, /这个方案行不行/)
+
+  ui.dispose()
+})
+
+test('快速移动面板：从节点仓库里按节点 key 取到题干，重复的只算一条', async () => {
+  const dom = buildPanelDom({ withQuestion: false })
+  const seat = dom.doc.createElement('div')
+  seat.setAttribute('data-chat-flow-key', 'g-ask-store')
+  seat.setAttribute('data-chat-turn', '2')
+  seat.setAttribute('data-step-process', 'true')
+  seat.rect = rect(300, 600, 600, 26)
+  const askHeader = dom.doc.createElement('div')
+  askHeader.textContent = '向用户提出了问题'
+  seat.appendChild(askHeader)
+  dom.flow.appendChild(seat)
+
+  const row = dom.doc.createElement('div')
+  row.setAttribute('data-chat-flow-kind', 'tool-call')
+  row.setAttribute('data-chat-node-key', '9:tool-callabc')
+  row.textContent = '提问1/1 已回答'
+  seat.appendChild(row)
+
+  // 真机结构：行的 fiber 上游有个 ChatNodeSeat，带着 nodeStore；题干在仓库里那个节点的数据中。
+  const chatNode = {
+    key: '9:tool-callabc',
+    kind: 'tool-call',
+    data: { root: { input: JSON.stringify({ questions: [{ header: '内容来源口径', question: 'wiki 的文字你打算怎么来？' }] }) } },
+  }
+  row['__reactFiber$store'] = {
+    memoizedProps: {},
+    return: { memoizedProps: { nodeStore: { byKey: new Map([['9:tool-callabc', chatNode]]) } }, return: null },
+  }
+
+  const ui = await openPanelIn(dom)
+  ui.button.dispatchEvent({ type: 'click' })
+  const cats = ui.panel.querySelectorAll('[data-dcg-cat]')
+  cats.find((item) => item.getAttribute('data-dcg-cat') === 'question').dispatchEvent({ type: 'click' })
+  const entries = ui.panel.querySelector('[data-dcg-list]').querySelectorAll('[data-dcg-entry]')
+  assert.equal(entries.length, 1)
+  // 右列摘要按 20 字截断，全文在悬停里。
+  assert.match(entries[0].textContent, /内容来源口径/)
+  assert.match(entries[0].title, /wiki 的文字你打算怎么来/)
+  // 同一段文字在节点里出现两次也只算一句。
+  assert.equal(String(entries[0].title).match(/wiki 的文字你打算怎么来/g).length, 1)
 
   ui.dispose()
 })
