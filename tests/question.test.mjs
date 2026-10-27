@@ -93,6 +93,17 @@ function buildFlow(doc, chatNode, options = {}) {
   content.setAttribute('data-step-process-content', '')
   body.appendChild(content)
 
+  if (options.lead !== undefined) {
+    // 真机组里经常先放一行思考，再放工具/提问行。
+    const lead = doc.createElement('div')
+    lead.setAttribute('data-chat-flow-key', 'r1')
+    lead.setAttribute('data-chat-flow-kind', 'reasoning')
+    lead.setAttribute('data-chat-node-key', 'r1')
+    lead.textContent = options.lead
+    lead.rect = { left: 0, top: 0, width: 700, height: 24, right: 700, bottom: 24 }
+    content.appendChild(lead)
+  }
+
   const row = doc.createElement('div')
   row.setAttribute('data-chat-flow-key', 'k1')
   row.setAttribute('data-chat-flow-kind', 'tool-call')
@@ -105,10 +116,12 @@ function buildFlow(doc, chatNode, options = {}) {
     marker.setAttribute('data-tool', 'ask_user_question')
     row.appendChild(marker)
   }
-  // 真机：行是 ChatNodeSeat 的根节点，parent fiber 的 props 里有 nodeStore。
-  row['__reactFiber$test'] = {
-    memoizedProps: { className: 'row' },
-    return: { memoizedProps: { nodeStore: { byKey: new Map([['k1', chatNode]]) } }, return: null },
+  if (options.withNode !== false) {
+    // 真机：行是 ChatNodeSeat 的根节点，parent fiber 的 props 里有 nodeStore。
+    row['__reactFiber$test'] = {
+      memoizedProps: { className: 'row' },
+      return: { memoizedProps: { nodeStore: { byKey: new Map([['k1', chatNode]]) } }, return: null },
+    }
   }
   content.appendChild(row)
   seat.appendChild(body)
@@ -150,6 +163,21 @@ test('收起的过程组同样能读题干', () => {
 
 test('界面语言不是中文时按 data-tool 标记认提问行', () => {
   assertQuestionEntry(entryFor(answeredNode(), { rowText: 'Ask question1/1 answered', marker: true }))
+})
+
+test('组里第一行是思考时，摘要仍取题干', () => {
+  const entry = entryFor(answeredNode(), { lead: '思考The user says "现在ai提问还是不显示内容"' })
+  assertQuestionEntry(entry)
+})
+
+test('题干读不到时退回提问行文案，而不是思考摘要', () => {
+  const entry = entryFor(answeredNode(), {
+    lead: '思考The user says "现在ai提问还是不显示内容"',
+    withNode: false,
+  })
+  assert.equal(entry.type, 'question')
+  assert.equal(entry.text, '提问1/1 已回答')
+  assert.equal(entry.detail, null)
 })
 
 test('工具组的行不会误判成提问', () => {
