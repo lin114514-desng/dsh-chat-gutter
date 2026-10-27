@@ -901,6 +901,64 @@ test('快速移动面板：读不到节点内部数据时，提问组退回原�
   ui.dispose()
 })
 
+test('快速移动面板：鼠标移到按钮上自动弹出，移开自动收起', async () => {
+  const dom = buildPanelDom()
+  const ui = await openPanelIn(dom)
+  assert.equal(ui.panel.style.display, 'none')
+
+  ui.nav.dispatchEvent({ type: 'mouseenter' })
+  await sleep(240)
+  assert.equal(ui.panel.style.display, 'flex')
+
+  ui.nav.dispatchEvent({ type: 'mouseleave' })
+  await sleep(520)
+  assert.equal(ui.panel.style.display, 'none')
+
+  ui.dispose()
+})
+
+test('快速移动面板：鼠标从按钮移进面板时保持打开，离开面板才收', async () => {
+  const dom = buildPanelDom()
+  const ui = await openPanelIn(dom)
+
+  ui.nav.dispatchEvent({ type: 'mouseenter' })
+  await sleep(240)
+  assert.equal(ui.panel.style.display, 'flex')
+
+  // 按钮和面板之间有 8px 缝：穿过缝隙时面板不能先收掉。
+  ui.nav.dispatchEvent({ type: 'mouseleave' })
+  ui.panel.dispatchEvent({ type: 'mouseenter' })
+  await sleep(520)
+  assert.equal(ui.panel.style.display, 'flex')
+
+  ui.panel.dispatchEvent({ type: 'mouseleave' })
+  await sleep(520)
+  assert.equal(ui.panel.style.display, 'none')
+
+  ui.dispose()
+})
+
+test('快速移动面板：点过面板里的分类就钉住，鼠标移开也不收，再点按钮才收', async () => {
+  const dom = buildPanelDom()
+  const ui = await openPanelIn(dom)
+
+  ui.nav.dispatchEvent({ type: 'mouseenter' })
+  await sleep(240)
+  assert.equal(ui.panel.style.display, 'flex')
+
+  const cats = ui.panel.querySelectorAll('[data-dcg-cat]')
+  cats.find((item) => item.getAttribute('data-dcg-cat') === 'tool').dispatchEvent({ type: 'click' })
+  ui.panel.dispatchEvent({ type: 'mouseleave' })
+  await sleep(520)
+  assert.equal(ui.panel.style.display, 'flex')
+
+  ui.button.dispatchEvent({ type: 'click' })
+  assert.equal(ui.panel.style.display, 'none')
+
+  ui.dispose()
+})
+
+// 「加载更早」夹具：官方把入口放在聊天流所在那一列的顶部、聊天流之前。
 // 那一列由 data-chat-flow 标识，聊天流本体是列里的 [data-slot="conversation.chat.flow"]。
 function buildOlderDom(options = {}) {
   const doc = new FakeDocument()
