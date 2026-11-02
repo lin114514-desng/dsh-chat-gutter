@@ -241,6 +241,44 @@ test('提问按组头分类：组内容里提到 ask_user_question 的工具组�
   dispose()
 })
 
+test('回合结束时只换组头文案：没有别的结构变化，也要补上 🤔', async () => {
+  const dom = buildDom()
+  // 一个正在跑的过程组：组头是进行中的活动文案，此时它还只是工具组。
+  const seat = dom.doc.createElement('div')
+  seat.setAttribute('data-chat-flow-key', 'group:3')
+  seat.setAttribute('data-chat-group-key', 'group:3')
+  seat.setAttribute('data-chat-turn', '3')
+  seat.setAttribute('data-step-process', 'true')
+  seat.rect = rect(300, 660, 600, 120)
+  const header = dom.doc.createElement('div')
+  header.rect = rect(300, 660, 600, 26)
+  const label = dom.doc.createElement('span')
+  label.rect = rect(322, 660, 400, 22)
+  label.textContent = '正在调用工具'
+  header.appendChild(label)
+  seat.appendChild(header)
+  const body = dom.doc.createElement('div')
+  body.setAttribute('data-step-process-body', '')
+  seat.appendChild(body)
+  dom.flow.appendChild(seat)
+
+  const windowStub = makeWindowStub()
+  const { exports } = loadClient({ window: windowStub, document: dom.doc })
+  const dispose = exports.apply(buildCtx().ctx)
+
+  const askedCount = () => bandTexts(dom.doc, 'dsh-chat-gutter').filter((text) => text === '🤔').length
+  assert.equal(askedCount(), 0, '正在跑的工具组不该挂 🤔')
+
+  // 官方在回合结束那一刻把组头换成摘要，别的 DOM 一点没动（行、折叠状态、计数都没变）。
+  label.textContent = '已调用工具，已读取文件，向用户提出了问题'
+  windowStub.dispatch('resize')
+  await sleep(30)
+
+  assert.equal(askedCount(), 1, '组头一换成提问摘要，🤔 就要跟上来')
+
+  dispose()
+})
+
 test('配置开关：关总开关立刻清空，重新打开立刻恢复；窄窗口隐藏整条带', async () => {
   const dom = buildDom()
   const windowStub = makeWindowStub()
