@@ -81,7 +81,7 @@ DSH 桌面端 / Web 聊天区两侧空白带上的标记，加上输入区一个
 ## 开发与测试
 
 ```bash
-cd "F:\01AI\dsh default\chuangzaomoshi\dsh-chat-gutter"
+cd dsh-chat-gutter
 node --check lib/client.js && node --check lib/index.js
 pnpm test                          # node --test "tests/*.test.mjs"
 pnpm pack                          # dsh-chat-gutter-<版本>.tgz
